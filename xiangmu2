@@ -1,0 +1,264 @@
+import re
+import json
+import tkinter as tk
+from tkinter import filedialog
+from PIL import Image
+import pytesseract
+from tencentcloud.common import credential
+from tencentcloud.common.profile.client_profile import ClientProfile
+from tencentcloud.common.profile.http_profile import HttpProfile
+from tencentcloud.tmt.v20180321 import tmt_client, models
+
+
+def detect_language(text):
+    if re.search(r"[一-龥]", text):
+        return "zh"
+    elif re.search(r"[A-Za-z]", text):
+        return "en"
+    else:
+        return None
+
+def translate_text_to_target_language(text, target_language):
+    cred = credential.Credential("AKIDDIAoDPRH5i8KMNPMBqKrPlsnfBWhopib", "sgT4Yoz0MXVGtWkmnmeVK4d8Tk3Ofx4y")
+
+    httpProfile = HttpProfile()
+    httpProfile.endpoint = "tmt.tencentcloudapi.com"
+
+    clientProfile = ClientProfile()
+    clientProfile.httpProfile = httpProfile
+
+    tmt_client_instance = tmt_client.TmtClient(cred, "ap-guangzhou", clientProfile)
+
+    req = models.TextTranslateRequest()
+    params = {
+        "SourceText": text,
+        "Source": "auto",
+        "Target": target_language,
+        "ProjectId": 0
+    }
+    req.from_json_string(json.dumps(params))
+
+    try:
+        resp = tmt_client_instance.TextTranslate(req)
+        translated_text = json.loads(resp.to_json_string())["TargetText"]
+        return translated_text
+    except Exception as e:
+        print("Error:", e)
+        print("Response:", resp.to_json_string())
+        return None
+
+class InputApplication(tk.Frame):
+    def __init__(self, master=None):
+        super().__init__(master)
+        self.master = master
+        self.pack(expand=True, fill=tk.BOTH)
+        # 在这里添加类的其他代码和方法
+
+        self.create_input_widgets()
+        self.target_language = tk.StringVar()
+        self.target_language.set("en")
+        
+        self.output_app = output_app
+        self.master = tk.Toplevel()
+        self.master.geometry("400x400")
+        self.master.title("输入窗口")
+        self.master.attributes("-topmost", True)
+        self.master.attributes("-alpha", 0.8)
+        self.master.resizable(True, True)
+        self.create_input_widgets()
+        self.master.bind('<Alt-q>', self.translate_text)
+
+
+
+    def create_input_widgets(self):
+        self.input_text = tk.Text(self.master, height=5)
+        self.input_text.pack(fill="both", padx=5, pady=5, expand=True)
+
+        self.ocr_screen_button = tk.Button(self.master, text="识别屏幕文字", command=self.ocr_image)
+
+        self.ocr_screen_button.pack(side=tk.LEFT, padx=5, pady=5)
+
+        self.translate_button = tk.Button(self.master, text="翻译", command=self.translate_text)
+        self.translate_button.pack(side=tk.RIGHT, padx=5, pady=5)
+
+        self.drag_handle_move = tk.Canvas(self.master, width=400, height=20, bg='white', highlightthickness=0)
+        self.drag_handle_move.pack(fill=tk.X)
+        self.drag_handle_move.bind("<ButtonPress-1>", self.start_move)
+        self.drag_handle_move.bind("<ButtonRelease-1>", self.stop_move)
+        self.drag_handle_move.bind("<B1-Motion>", self.on_motion)
+
+        self.drag_handle_resize = tk.Canvas(self.master, width=20, height=20, bg='white', highlightthickness=0)
+        self.drag_handle_resize.pack(side=tk.BOTTOM, anchor=tk.SE)
+        self.drag_handle_resize.bind("<ButtonPress-1>", self.start_resize)
+        self.drag_handle_resize.bind("<ButtonRelease-1>", self.stop_resize)
+        self.drag_handle_resize.bind("<B1-Motion>", self.on_motion_resize)
+
+        self.pack(expand=True, fill=tk.BOTH)
+
+    # 调整窗口大小的拖动手柄
+        self.drag_handle_resize = tk.Canvas(self.master, width=20, height=20, bg='white', highlightthickness=0)
+        self.drag_handle_resize.pack(side=tk.BOTTOM, anchor=tk.SE)
+        self.drag_handle_resize.bind("<ButtonPress-1>", self.start_resize)
+        self.drag_handle_resize.bind("<ButtonRelease-1>", self.stop_resize)
+        self.drag_handle_resize.bind("<B1-Motion>", self.on_motion_resize)
+
+    self.pack(expand=True, fill=tk.BOTH)
+        
+        
+    def ocr_image(self):
+        file_path = filedialog.askopenfilename(filetypes=[("Image Files", "*.png;*.jpg;*.jpeg")])
+        if file_path:
+            try:
+                image = Image.open(file_path)
+                text = pytesseract.image_to_string(image, lang='chi_sim+eng')
+                self.input_text.delete("1.0", tk.END)
+                self.input_text.insert(tk.END, text)
+            except Exception as e:
+                print("OCR Error:", e)
+
+
+    # 移动窗口的拖动手柄
+        self.drag_handle_move = tk.Canvas(self.master, width=400, height=20, bg='white', highlightthickness=0)
+        self.drag_handle_move.pack(fill=tk.X)
+        self.drag_handle_move.bind("<ButtonPress-1>", self.start_move)
+        self.drag_handle_move.bind("<ButtonRelease-1>", self.stop_move)
+        self.drag_handle_move.bind("<B1-Motion>", self.on_motion)
+
+    # 调整窗口大小的拖动手柄
+        self.drag_handle_resize = tk.Canvas(self.master, width=20, height=20, bg='white', highlightthickness=0)
+        self.drag_handle_resize.pack(side=tk.BOTTOM, anchor=tk.SE)
+        self.drag_handle_resize.bind("<ButtonPress-1>", self.start_resize)
+        self.drag_handle_resize.bind("<ButtonRelease-1>", self.stop_resize)
+        self.drag_handle_resize.bind("<B1-Motion>", self.on_motion_resize)
+
+        self.pack(expand=True, fill=tk.BOTH)
+        
+    def start_resize(self, event):
+        self.resize_x = event.x_root
+        self.resize_y = event.y_root
+
+    def stop_resize(self, event):
+        self.resize_x = None
+        self.resize_y = None
+
+    def on_motion_resize(self, event):
+     if self.resize_x is not None and self.resize_y is not None:
+        x_diff = event.x_root - self.resize_x
+        y_diff = event.y_root - self.resize_y
+
+        new_width = self.master.winfo_width() + x_diff
+        new_height = self.master.winfo_height() + y_diff
+
+        self.master.geometry(f"{new_width}x{new_height}")
+
+        self.resize_x = event.x_root
+        self.resize_y = event.y_root
+
+    def start_move(self, event):
+       self.x = event.x
+       self.y = event.y
+       self._dragging_window = self.master.winfo_pointerxy()
+
+    def stop_move(self, event):
+       self.x = None
+       self.y = None
+
+    def on_motion(self, event):
+      if self.x is not None and self.y is not None:
+        x = (event.x_root - self.x - self.master.winfo_rootx() + 1)
+        y = (event.y_root - self.y - self.master.winfo_rooty() + 1)
+        self.master.geometry("+%s+%s" % (x, y))
+
+    def translate_text(self, event=None):
+       source_text = self.input_text.get("1.0", tk.END).strip()
+       if source_text:
+        detected_language = detect_language(source_text)
+        if detected_language is not None:
+            if detected_language == "zh":
+                target_language = "en"
+            elif detected_language == "en":
+                target_language = "zh"
+            else:
+                print("Detected language is not supported.")
+                return
+
+            translated_text = translate_text_to_target_language(source_text, target_language)
+            if translated_text is not None:
+                self.output_app.set_output_text(translated_text)
+            else:
+                print("Translation failed.")
+        else:
+            print("Language detection failed.")
+
+    # ... other functions ...
+
+class OutputApplication(tk.Frame):
+    
+    def __init__(self, master=None):
+        super().__init__(master)
+        output_app = OutputApplication(master=root)
+
+        self.master = tk.Toplevel(master)
+        self.master.geometry("400x200")
+        self.master.title("翻译结果窗口")
+        self.master.attributes("-topmost", True)
+        self.master.attributes("-alpha", 0.9)
+        self.create_output_widgets()
+        self.pack()
+
+    def create_output_widgets(self):
+        self.output_text = tk.Text(self.master, bg="white", fg="red", state=tk.DISABLED)
+
+        self.output_text.pack(fill=tk.BOTH, expand=True)
+    
+
+    
+    def set_output_text(self, text):
+        self.output_text.config(state=tk.NORMAL)
+        self.output_text.delete("1.0", tk.END)
+        self.output_text.insert(tk.END, text)
+        self.output_text.config(state=tk.DISABLED)
+    # ... other functions ...
+
+    
+
+    def create_input_widgets(self):
+        self.input_text = tk.Text(self.master, height=5)
+        self.input_text.pack(fill="both", padx=5, pady=5, expand=True)
+
+        self.ocr_screen_button = tk.Button(self.master, text="识别屏幕文字", command=self.ocr_image)
+
+        self.ocr_screen_button.pack(side=tk.LEFT, padx=5, pady=5)
+
+
+        self.drag_handle = tk.Canvas(self.master, width=400, height=20, bg='white', highlightthickness=0)
+        self.drag_handle.pack(fill=tk.X)
+        self.drag_handle.bind("<ButtonPress-1>", self.start_move)
+        self.drag_handle.bind("<ButtonRelease-1>", self.stop_move)
+        self.drag_handle.bind("<B1-Motion>", self.on_motion)
+        self.pack(expand=True, fill=tk.BOTH)
+    def ocr_image(self):
+        file_path = filedialog.askopenfilename(filetypes=[("Image Files", "*.png;*.jpg;*.jpeg")])
+        if file_path:
+            try:
+                image = Image.open(file_path)
+                text = pytesseract.image_to_string(image, lang='chi_sim+eng')
+                self.input_text.delete("1.0", tk.END)
+                self.input_text.insert(tk.END, text)
+            except Exception as e:
+                print("OCR Error:", e)
+        
+    
+    # ... other functions ...
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.withdraw()
+    output_app = OutputApplication(master=root)
+    input_app = InputApplication(output_app=output_app)
+    
+    input_app.master.protocol("WM_DELETE_WINDOW", root.destroy)
+    output_app.master.protocol("WM_DELETE_WINDOW", root.destroy)
+
+    input_app.mainloop()
+    output_app.mainloop()
